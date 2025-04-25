@@ -1,0 +1,244 @@
+{% extends 'base.html' %}
+
+{% block title %}Weather App - Map View{% endblock %}
+
+{% block extra_css %}
+<!-- Leaflet CSS -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<style>
+    #map-container {
+        height: 75vh;
+        width: 100%;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    
+    .map-controls {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 15px;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+        max-width: 300px;
+    }
+    
+    .selected-location {
+        margin-top: 15px;
+        padding: 15px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    }
+    
+    .map-instructions {
+        padding: 10px 15px;
+        margin-bottom: 15px;
+        background-color: #e3f2fd;
+        border-radius: 8px;
+        border-left: 4px solid #1e88e5;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2><i class="fas fa-map-marked-alt"></i> Select Location on Map</h2>
+            
+            <div class="map-instructions">
+                <p class="mb-0"><i class="fas fa-info-circle"></i> <strong>How to use:</strong> Click anywhere on the map to select a location. Then click the "Get Weather" button to see weather information for that location.</p>
+            </div>
+            
+            <div class="position-relative">
+                <div id="map-container"></div>
+                
+                <div class="map-controls">
+                    <h5><i class="fas fa-search-location"></i> Location Search</h5>
+                    <div class="input-group mb-3">
+                        <input type="text" id="location-search" class="form-control" placeholder="Enter location...">
+                        <button class="btn btn-primary" type="button" id="search-button">
+                            <i class="fas fa-search"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="selected-location mt-4" id="selected-location-container" style="display: none;">
+                <h4><i class="fas fa-map-pin"></i> Selected Location</h4>
+                <p id="selected-location-name">No location selected</p>
+                <p>Coordinates: <span id="selected-lat">0.000000</span>, <span id="selected-lng">0.000000</span></p>
+                
+                <form action="{% url 'get_weather' %}" method="get" id="weather-form">
+                    <input type="hidden" name="lat" id="lat-input">
+                    <input type="hidden" name="lon" id="lng-input">
+                    <button type="submit" class="btn btn-primary" id="get-weather-btn" disabled>
+                        <i class="fas fa-cloud-sun"></i> Get Weather for this Location
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Leaflet JS -->
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Initialize map
+        var map = L.map('map-container').setView([20, 0], 2); // Default to world view
+        
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+            maxZoom: 19
+        }).addTo(map);
+        
+        // Variables for storing marker and selected location
+        var marker = null;
+        var selectedLat = null;
+        var selectedLng = null;
+        
+        // Handle map clicks
+        map.on('click', function(e) {
+            // Get the coordinates
+            selectedLat = e.latlng.lat.toFixed(6);
+            selectedLng = e.latlng.lng.toFixed(6);
+            
+            // Update the form inputs
+            document.getElementById('lat-input').value = selectedLat;
+            document.getElementById('lng-input').value = selectedLng;
+            
+            // Update display
+            document.getElementById('selected-lat').textContent = selectedLat;
+            document.getElementById('selected-lng').textContent = selectedLng;
+            
+            // Get approximate location name using reverse geocoding
+            reverseGeocode(selectedLat, selectedLng);
+            
+            // Add or move marker
+            if (marker) {
+                marker.setLatLng(e.latlng);
+            } else {
+                marker = L.marker(e.latlng).addTo(map);
+            }
+            
+            // Enable the weather button
+            document.getElementById('get-weather-btn').disabled = false;
+            
+            // Show the selected location container
+            document.getElementById('selected-location-container').style.display = 'block';
+        });
+        
+        // Handle location search
+        document.getElementById('search-button').addEventListener('click', function() {
+            searchLocation();
+        });
+        
+        document.getElementById('location-search').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                searchLocation();
+            }
+        });
+        
+        function searchLocation() {
+            var query = document.getElementById('location-search').value.trim();
+            if (query) {
+                // Use Nominatim OpenStreetMap service for geocoding
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}`)
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data && data.length > 0) {
+                            // Get the first result
+                            var result = data[0];
+                            var lat = parseFloat(result.lat);
+                            var lng = parseFloat(result.lon);
+                            
+                            // Set map view to the result
+                            map.setView([lat, lng], 12);
+                            
+                            // Create a marker at the location
+                            if (marker) {
+                                marker.setLatLng([lat, lng]);
+                            } else {
+                                marker = L.marker([lat, lng]).addTo(map);
+                            }
+                            
+                            // Update selected location
+                            selectedLat = lat.toFixed(6);
+                            selectedLng = lng.toFixed(6);
+                            
+                            // Update form inputs
+                            document.getElementById('lat-input').value = selectedLat;
+                            document.getElementById('lng-input').value = selectedLng;
+                            
+                            // Update display
+                            document.getElementById('selected-lat').textContent = selectedLat;
+                            document.getElementById('selected-lng').textContent = selectedLng;
+                            document.getElementById('selected-location-name').textContent = result.display_name;
+                            
+                            // Enable the weather button
+                            document.getElementById('get-weather-btn').disabled = false;
+                            
+                            // Show the selected location container
+                            document.getElementById('selected-location-container').style.display = 'block';
+                        } else {
+                            alert('Location not found. Please try a different search term.');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error searching for location:', error);
+                        alert('Error searching for location. Please try again.');
+                    });
+            }
+        }
+        
+        function reverseGeocode(lat, lng) {
+            // Use Nominatim OpenStreetMap service for reverse geocoding
+            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data && data.display_name) {
+                        document.getElementById('selected-location-name').textContent = data.display_name;
+                    } else {
+                        document.getElementById('selected-location-name').textContent = 'Unknown location';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error reverse geocoding:', error);
+                    document.getElementById('selected-location-name').textContent = 'Unknown location';
+                });
+        }
+        
+        // Try to get user's location
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                function(position) {
+                    // Set map view to user's location
+                    var userLat = position.coords.latitude;
+                    var userLng = position.coords.longitude;
+                    map.setView([userLat, userLng], 10);
+                    
+                    // Add a marker for user's location
+                    L.circle([userLat, userLng], {
+                        color: 'blue',
+                        fillColor: '#3388ff',
+                        fillOpacity: 0.2,
+                        radius: 1000
+                    }).addTo(map).bindPopup("Your approximate location").openPopup();
+                },
+                function(error) {
+                    console.log('Error getting location:', error.message);
+                }
+            );
+        }
+    });
+</script>
+{% endblock %}
+

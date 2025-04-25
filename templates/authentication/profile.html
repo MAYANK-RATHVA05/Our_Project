@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+
+{% block title %}Weather App - Profile{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-lg-4 mb-4">
+            <!-- User Info Card -->
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-user-circle"></i> User Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        <div class="display-1 text-primary mb-3">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <h4>{{ user.username }}</h4>
+                        <p class="text-muted">Member since {{ user.date_joined|date:"F j, Y" }}</p>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <p><strong><i class="fas fa-envelope"></i> Email:</strong> {{ user.email }}</p>
+                        <p><strong><i class="fas fa-map-marker-alt"></i> Default Location:</strong> 
+                            {% if user.profile.default_location %}
+                                {{ user.profile.default_location }}
+                            {% else %}
+                                <span class="text-muted">Not set</span>
+                            {% endif %}
+                        </p>
+                        <p><strong><i class="fas fa-heart"></i> Saved Locations:</strong> {{ user.favorite_locations.count }}</p>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'password_change' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-key"></i> Change Password
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="col-lg-8">
+            <!-- Profile Update Form -->
+            <div class="card shadow mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-user-edit"></i> Update Profile</h5>
+                </div>
+                <div class="card-body">
+                    {% if messages %}
+                        {% for message in messages %}
+                            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                    
+                    <form method="post" action="{% url 'profile_update' %}">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label for="id_username" class="form-label">Username</label>
+                            <input type="text" class="form-control" id="id_username" name="username" value="{{ user.username }}" readonly>
+                            <div class="form-text">Username cannot be changed.</div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="id_email" name="email" value="{{ user.email }}">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="id_default_location" class="form-label">Default Location</label>
+                            <input type="text" class="form-control" id="id_default_location" name="default_location" 
+                                value="{{ user.profile.default_location|default:'' }}" placeholder="e.g., New York, US">
+                            <div class="form-text">This location will be used as default when you open the app.</div>
+                        </div>
+                        
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            
+            <!-- Favorite Locations -->
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="fas fa-heart"></i> Your Favorite Locations</h5>
+                </div>
+                <div class="card-body">
+                    {% if user.favorite_locations.all %}
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Location</th>
+                                        <th>Coordinates</th>
+                                        <th>Added</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for location in user.favorite_locations.all %}
+                                    <tr>
+                                        <td>{{ location.name }}</td>
+                                        <td>{{ location.latitude }}, {{ location.longitude }}</td>
+                                        <td>{{ location.created_at|date:"M d, Y" }}</td>
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{% url 'get_weather' %}?lat={{ location.latitude }}&lon={{ location.longitude }}" 
+                                                   class="btn btn-outline-primary" title="View Weather">
+                                                    <i class="fas fa-cloud-sun"></i>
+                                                </a>
+                                                <a href="{% url 'set_default_location' location.id %}" 
+                                                   class="btn btn-outline-success" title="Set as Default">
+                                                    <i class="fas fa-home"></i>
+                                                </a>
+                                                <form method="post" action="{% url 'delete_location' location.id %}" class="d-inline">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                                        <i class="fas fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center p-4">
+                            <div class="text-muted mb-3">
+                                <i class="fas fa-heart-broken fa-3x"></i>
+                            </div>
+                            <p>You haven't saved any favorite locations yet.</p>
+                            <a href="{% url 'home' %}" class="btn btn-primary">
+                                <i class="fas fa-search"></i> Find Locations
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

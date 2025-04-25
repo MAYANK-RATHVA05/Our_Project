@@ -1,0 +1,165 @@
+{% extends 'base.html' %}
+
+{% block title %}Weather App - Home{% endblock %}
+
+{% block content %}
+<!-- Welcome Section -->
+<section class="welcome-section">
+    <div class="container">
+        <h1>Welcome to Weather App</h1>
+        <p class="lead">Get accurate weather information for any location on Earth. Search for a location, select it on the map, or check your saved favorites.</p>
+    </div>
+</section>
+
+<!-- Search Form Section -->
+<section class="search-section">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="search-form">
+                    <h4><i class="fas fa-search"></i> Search for Weather</h4>
+                    <form method="post" action="{% url 'weather_search' %}">
+                        {% csrf_token %}
+                        <div class="input-group mb-3">
+                            <input type="text" name="location" class="form-control" placeholder="Enter city name or address..." required>
+                            <button class="btn btn-primary search-button" type="submit">
+                                <i class="fas fa-search"></i> Get Weather
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Weather Information Section -->
+{% if weather_data %}
+<section class="weather-info-section">
+    <div class="container">
+        <div class="row">
+            <div class="col-md-6 mx-auto">
+                <div class="weather-card">
+                    <div class="weather-card-header text-center">
+                        <h3>{{ weather_data.location_name }}</h3>
+                        <div class="weather-icon">
+                            <i class="fas {% if weather_data.condition == 'Clear' %}fa-sun{% elif weather_data.condition == 'Clouds' %}fa-cloud{% elif weather_data.condition == 'Rain' %}fa-cloud-rain{% elif weather_data.condition == 'Snow' %}fa-snowflake{% else %}fa-cloud-sun{% endif %}"></i>
+                        </div>
+                        <div class="temperature">{{ weather_data.temperature }}°C</div>
+                        <p>{{ weather_data.condition }}</p>
+                    </div>
+                    <div class="weather-details">
+                        <div class="row">
+                            <div class="col-6">
+                                <p><i class="fas fa-tint"></i> <strong>Humidity:</strong> {{ weather_data.humidity }}%</p>
+                            </div>
+                            <div class="col-6">
+                                <p><i class="fas fa-wind"></i> <strong>Wind:</strong> {{ weather_data.wind_speed }} km/h</p>
+                            </div>
+                        </div>
+                        
+                        {% if user.is_authenticated %}
+                        <div class="text-center mt-3">
+                            <form method="post" action="{% url 'save_location' %}">
+                                {% csrf_token %}
+                                <input type="hidden" name="name" value="{{ weather_data.location_name }}">
+                                <input type="hidden" name="latitude" value="{{ weather_data.latitude }}">
+                                <input type="hidden" name="longitude" value="{{ weather_data.longitude }}">
+                                <button class="btn btn-outline-primary" type="submit">
+                                    <i class="fas fa-heart"></i> Save to Favorites
+                                </button>
+                            </form>
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+{% endif %}
+
+<!-- Map Section -->
+<section class="map-section mt-4">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h4><i class="fas fa-map-marker-alt"></i> Select Location on Map</h4>
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="input-group">
+                            <input type="text" id="map-search-input" class="form-control" placeholder="Search for a location...">
+                            <button class="btn btn-primary" type="button" id="map-search-button">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="col-md-6 text-md-end">
+                        <a href="{% url 'map_view' %}" class="btn btn-outline-primary">
+                            <i class="fas fa-expand-alt"></i> Open Full Map
+                        </a>
+                    </div>
+                </div>
+                
+                <div id="map" class="map-container">
+                    <!-- Map will be initialized here with JavaScript -->
+                </div>
+                
+                <!-- Selected Location Info -->
+                <div id="location-info" class="mt-3 p-3 bg-light rounded" style="display: none;">
+                    <h5><i class="fas fa-map-pin"></i> Selected Location</h5>
+                    <p id="selected-location-name">Loading location name...</p>
+                    <p><small>Coordinates: <span id="selected-coordinates"></span></small></p>
+                    
+                    <form action="{% url 'get_weather' %}" method="get">
+                        <input type="hidden" name="lat" id="lat-input">
+                        <input type="hidden" name="lon" id="lng-input">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-cloud-sun"></i> Get Weather
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Favorites Section - Only visible for logged in users -->
+{% if user.is_authenticated and favorite_locations %}
+<section class="favorites-section">
+    <div class="container">
+        <h4><i class="fas fa-heart"></i> Your Favorite Locations</h4>
+        <div class="row">
+            {% for location in favorite_locations %}
+            <div class="col-md-4 mb-3">
+                <div class="favorite-location">
+                    <div class="d-flex justify-content-between">
+                        <h5 class="favorite-location-name">{{ location.name }}</h5>
+                        <div>
+                            <a href="{% url 'get_weather' %}?lat={{ location.latitude }}&lon={{ location.longitude }}" class="btn btn-sm btn-primary">
+                                <i class="fas fa-cloud-sun"></i>
+                            </a>
+                            <form method="post" action="{% url 'delete_location' location.id %}" class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-danger">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                    <p class="text-muted mb-0"><small>Coordinates: {{ location.latitude }}, {{ location.longitude }}</small></p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+{% endif %}
+{% endblock %}
+{% block extra_js %}
+<!-- Leaflet.js for maps -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+<script src="/static/js/map.js"></script>
+{% endblock %}
+
